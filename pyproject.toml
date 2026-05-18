@@ -1,0 +1,6 @@
+[project]
+name = "gal-translator"
+version = "0.1.0"
+description = "Local Galgame script scanning and translation assistant."
+requires-python = ">=3.12"
+
