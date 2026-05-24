@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from gal_translator.archives import ArchiveDiagnostic, ArchiveInspector
+
 
 @dataclass(frozen=True)
 class ScannedFile:
@@ -20,6 +22,7 @@ class ScanReport:
     directories: tuple[str, ...]
     extensions: tuple[str, ...]
     files_by_extension: dict[str, tuple[ScannedFile, ...]]
+    archive_diagnostics: tuple[ArchiveDiagnostic, ...]
 
 
 class GameScanner:
@@ -54,6 +57,11 @@ class GameScanner:
             for extension, items in sorted(grouped.items(), key=lambda item: item[0])
         }
 
+        archive_diagnostics = ArchiveInspector().inspect_game_root(
+            game_root,
+            [file.relative_path for file in files],
+        )
+
         return ScanReport(
             input_path=resolved_input,
             game_root=game_root,
@@ -62,5 +70,6 @@ class GameScanner:
             directories=tuple(sorted(directories)),
             extensions=tuple(files_by_extension.keys()),
             files_by_extension=files_by_extension,
+            archive_diagnostics=archive_diagnostics,
         )
 

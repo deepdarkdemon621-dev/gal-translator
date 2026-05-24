@@ -29,6 +29,21 @@ class DirectImportTests(unittest.TestCase):
             self.assertTrue((project.project_root / "scripts" / "scenario" / "opening.ks").is_file())
             self.assertFalse((game_dir / "scripts").exists())
 
+    def test_importer_does_not_copy_root_readme_text_for_direct_script_profile(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            game_dir = root / "Game"
+            (game_dir / "scenario").mkdir(parents=True)
+            (game_dir / "readme.txt").write_text("not story", encoding="utf-8")
+            (game_dir / "scenario" / "opening.txt").write_text("opening story", encoding="utf-8")
+            project = TranslationProjectManager(root / "Workspace").create_project(game_dir)
+            profile = ExtractorProfileRegistry.default().match(project.scan_report)[0]
+
+            imported = DirectScriptImporter().import_scripts(project, profile)
+
+            self.assertEqual([script.relative_path for script in imported], ["scenario/opening.txt"])
+            self.assertFalse((project.project_root / "scripts" / "readme.txt").exists())
+
     def test_parser_and_filter_keep_story_japanese_and_skip_system_text(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

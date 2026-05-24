@@ -44,6 +44,43 @@ class ScannerDetectorTests(unittest.TestCase):
         self.assertGreaterEqual(candidates[0].confidence, candidates[-1].confidence)
         self.assertTrue(any(".xp3" in reason for reason in candidates[0].reasons))
 
+    def test_scanner_reports_pf8_archive_diagnostics_and_detector_prefers_ast_package(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "game.exe").write_bytes(b"MZ")
+            (root / "patch.xp3").write_bytes(b"XP3\r\n \n\x1a")
+            (root / "game.pfs").write_bytes(
+                b"pf83"
+                + _pf8_entry("font\\sourcehansans-bold.otf", 128, 20)
+                + _pf8_entry("system\\adv\\mainloop.lua", 148, 10)
+                + _pf8_entry("script\\scene01.ast", 158, 30)
+                + _pf8_entry("script\\scene02.ast", 188, 40)
+                + b"x" * 256
+            )
+
+            report = GameScanner().scan(root / "game.exe")
+            candidates = EngineDetector().detect(report)
+
+        self.assertEqual(len(report.archive_diagnostics), 1)
+        diagnostic = report.archive_diagnostics[0]
+        self.assertEqual(diagnostic.format_id, "pf8_pfs")
+        self.assertEqual(diagnostic.structured_entry_count, 4)
+        self.assertEqual(diagnostic.visible_extension_counts[".ast"], 2)
+        self.assertIn("script\\scene01.ast", diagnostic.visible_script_paths)
+        self.assertEqual(candidates[0].engine_id, "pf8_pfs_ast")
+        self.assertIn("visible .ast script entries", candidates[0].reasons[1])
+
+
+def _pf8_entry(path: str, offset: int, size: int) -> bytes:
+    raw_path = path.encode("utf-8")
+    return (
+        offset.to_bytes(4, "little")
+        + size.to_bytes(4, "little")
+        + len(raw_path).to_bytes(4, "little")
+        + raw_path
+        + b"\x00\x00\x00\x00"
+    )
+
 
 if __name__ == "__main__":
     unittest.main()

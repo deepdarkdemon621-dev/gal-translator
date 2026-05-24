@@ -46,6 +46,18 @@ class ProjectProfileTests(unittest.TestCase):
             self.assertEqual(profiles[0].target_lang, "zh-Hans")
             self.assertIn("**/*.ks", profiles[0].script_globs)
 
+    def test_profile_registry_does_not_match_root_readme_text_as_direct_script(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "game.exe").write_bytes(b"MZ")
+            (root / "readme.txt").write_text("not story", encoding="utf-8")
+            (root / "patch_append1.txt").write_text("patch notes", encoding="utf-8")
+            project = TranslationProjectManager(root / "workspace").create_project(root)
+
+            profiles = ExtractorProfileRegistry.default().match(project.scan_report)
+
+            self.assertEqual(profiles, [])
+
     def test_profile_registry_loads_user_json_profiles(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

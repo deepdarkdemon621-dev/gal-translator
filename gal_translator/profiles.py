@@ -34,7 +34,17 @@ class ExtractorProfileRegistry:
                     target_lang="zh-Hans",
                     extensions=(".ks", ".rpy", ".txt", ".json", ".csv"),
                     directories=("scenario", "script"),
-                    script_globs=("**/*.ks", "**/*.rpy", "**/*.txt", "**/*.json", "**/*.csv"),
+                    script_globs=(
+                        "**/*.ks",
+                        "**/*.rpy",
+                        "0.txt",
+                        "scenario/**/*.txt",
+                        "scenario/**/*.json",
+                        "scenario/**/*.csv",
+                        "script/**/*.txt",
+                        "script/**/*.json",
+                        "script/**/*.csv",
+                    ),
                     encoding="utf-8",
                 )
             ]
@@ -56,11 +66,34 @@ class ExtractorProfileRegistry:
 
 
 def _matches(profile: ExtractorProfile, report: ScanReport) -> bool:
+    if profile.profile_id == "direct_script":
+        return _matches_direct_script(report)
+
     if set(profile.extensions).intersection(report.extensions):
         return True
 
     root_dirs = {directory.split("/", 1)[0].lower() for directory in report.directories}
     return bool(root_dirs.intersection(profile.directories))
+
+
+def _matches_direct_script(report: ScanReport) -> bool:
+    root_dirs = {directory.split("/", 1)[0].lower() for directory in report.directories}
+    if root_dirs.intersection({"scenario", "script"}):
+        return True
+
+    for file in report.files:
+        normalized = file.relative_path.lower().replace("\\", "/")
+        if file.extension in {".ks", ".rpy"}:
+            return True
+        if normalized == "0.txt":
+            return True
+        if normalized.startswith(("scenario/", "script/")) and file.extension in {
+            ".csv",
+            ".json",
+            ".txt",
+        }:
+            return True
+    return False
 
 
 def _load_profile(path: Path) -> ExtractorProfile:

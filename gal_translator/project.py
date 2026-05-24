@@ -77,6 +77,21 @@ def _scan_payload(report: ScanReport) -> dict[str, Any]:
         "extensionCounts": {
             extension: len(files) for extension, files in report.files_by_extension.items()
         },
+        "archiveDiagnostics": [
+            {
+                "relativePath": diagnostic.relative_path,
+                "formatId": diagnostic.format_id,
+                "label": diagnostic.label,
+                "magic": diagnostic.magic,
+                "size": diagnostic.size,
+                "sampledBytes": diagnostic.sampled_bytes,
+                "structuredEntryCount": diagnostic.structured_entry_count,
+                "visibleExtensionCounts": diagnostic.visible_extension_counts,
+                "visibleScriptPaths": list(diagnostic.visible_script_paths),
+                "notes": list(diagnostic.notes),
+            }
+            for diagnostic in report.archive_diagnostics
+        ],
         "files": [
             {
                 "relativePath": file.relative_path,
