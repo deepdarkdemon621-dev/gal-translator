@@ -1,5 +1,14 @@
 # Findings
 
+## 2026-05-24 Stale LunaHook Process Finding
+
+- A saved LunaHook bridge process can remain alive after the target game process exits.
+- This is not a healthy Hook capture state: the bridge process may still exist, but it cannot capture new game text from the old `gamePid`.
+- `source-log-status` now separates `lunaHookBridge.currentProcessActive` from `lunaHookBridge.gameProcessActive`.
+- When the bridge process is alive but the target game pid is gone, `closedLoopProof.status=hook_game_inactive`.
+- The correct operator action is to restart the game and restart the recoverable source-log session with `-StartLunaHookBridge`; do not interpret the old bridge process as proof that live capture is still working.
+- This improves the reliability of the game-window closed-loop recovery path after pausing, closing the game, or resuming the machine.
+
 ## 2026-05-24 Pause Finding
 
 - The current practical product route is confirmed: pre-extracted Artemis scripts provide the local translation-state base, while LunaHook/source-log capture drives scoped translation and an external subtitle window during play.

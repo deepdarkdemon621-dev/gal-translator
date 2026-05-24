@@ -1,5 +1,37 @@
 # Progress
 
+## 2026-05-24 Stale LunaHook Target Diagnostic
+
+- Rechecked the paused real session with `source-log-status` after the previous commit.
+- Current real process state showed a recovery edge case: the source-log watcher and LunaHook bridge processes are still active, but `selectoblige.exe` and the saved subtitle-window process are no longer active.
+- Tightened `source-log-status` for this condition:
+  - `lunaHookBridge` now reports `gameProcessActive` for the saved `gamePid`.
+  - `closedLoopProof` now reports `status=hook_game_inactive` when the bridge process is alive but its target game pid is gone.
+  - `closedLoopProof` includes `lunaHookGameProcessActive`.
+  - `nextActions` now tells the operator to start the game and restart the source-log session with `-StartLunaHookBridge` instead of implying the old bridge can still capture new text.
+- Real status after the change:
+  - `status=watcher_active`
+  - `closedLoopProof.status=hook_game_inactive`
+  - `lunaHookBridge.currentProcessActive=true`
+  - `lunaHookBridge.gameProcessActive=false`
+  - Next action explicitly says `Game process is not running (selectoblige.exe)` and to restart the game/session.
+
+Verification:
+
+```powershell
+python -m unittest tests.test_cli.CliTests.test_source_log_status_reports_paused_scoped_loop tests.test_cli.CliTests.test_source_log_status_reports_stale_lunahook_game_pid -v
+```
+
+Result: 2 tests passed.
+
+Full regression verification:
+
+```powershell
+python -m unittest discover -v
+```
+
+Result: 145 tests passed.
+
 ## 2026-05-24 Pause Checkpoint And Commit Handoff
 
 - User requested pausing the current task after the scoped LunaHook/source-log closed loop reached a usable state.

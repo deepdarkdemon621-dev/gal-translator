@@ -1517,12 +1517,15 @@ def _source_log_status_luna_hook_bridge(session_info: dict[str, Any] | None) -> 
     if not isinstance(bridge, dict):
         return None
     status_log = bridge.get("statusLog") if isinstance(bridge.get("statusLog"), dict) else None
+    game_pid = bridge.get("gamePid")
+    game_process_active = _process_is_running(game_pid) if isinstance(game_pid, int) else None
     return {
         "currentProcessActive": bridge.get("currentProcessActive"),
         "started": bridge.get("started"),
         "enabled": bridge.get("enabled"),
         "pid": bridge.get("pid"),
-        "gamePid": bridge.get("gamePid"),
+        "gamePid": game_pid,
+        "gameProcessActive": game_process_active,
         "statusLog": status_log,
     }
 
@@ -1548,6 +1551,8 @@ def _source_log_closed_loop_proof(payload: dict[str, Any]) -> dict[str, Any]:
     proof_status = "not_ready"
     if watcher.get("currentProcessActive") is not True:
         proof_status = "watcher_inactive"
+    elif luna_hook.get("enabled") and luna_hook.get("gameProcessActive") is False:
+        proof_status = "hook_game_inactive"
     elif subtitle.get("currentProcessActive") is not True:
         proof_status = "subtitle_inactive"
     elif not latest_source:
@@ -1579,6 +1584,7 @@ def _source_log_closed_loop_proof(payload: dict[str, Any]) -> dict[str, Any]:
         "watcherActive": watcher.get("currentProcessActive"),
         "subtitleActive": subtitle.get("currentProcessActive"),
         "lunaHookBridgeActive": luna_hook.get("currentProcessActive"),
+        "lunaHookGameProcessActive": luna_hook.get("gameProcessActive"),
     }
 
 
@@ -1620,6 +1626,13 @@ def _source_log_status_next_actions(payload: dict[str, Any]) -> list[str]:
             f"Full archive translation remains paused at {translated}/{total} translated with {pending} pending; continue scoped source-log translation only."
         )
 
+    game_checks = payload.get("processChecks", {}).get("game") if isinstance(payload.get("processChecks"), dict) else []
+    if isinstance(game_checks, list) and game_checks and not any(
+        check.get("running") for check in game_checks if isinstance(check, dict)
+    ):
+        names = ", ".join(str(check.get("name")) for check in game_checks if isinstance(check, dict) and check.get("name"))
+        actions.append(f"Game process is not running ({names}); start the game before expecting new Hook captures.")
+
     lock = payload.get("translationLock") if isinstance(payload.get("translationLock"), dict) else {}
     if lock.get("exists"):
         actions.append("A translation lock is present; wait for the active scoped batch or clear only a confirmed stale lock.")
@@ -1654,7 +1667,9 @@ def _source_log_status_next_actions(payload: dict[str, Any]) -> list[str]:
         actions.append("The saved clipboard bridge is not running; restart source-log-session with -StartClipboardBridge if Hook output is clipboard-only.")
 
     luna_hook_bridge = payload.get("lunaHookBridge") if isinstance(payload.get("lunaHookBridge"), dict) else {}
-    if luna_hook_bridge.get("currentProcessActive") is True:
+    if luna_hook_bridge.get("currentProcessActive") is True and luna_hook_bridge.get("gameProcessActive") is False:
+        actions.append("The LunaHook bridge process is still running, but its target game pid is no longer active; restart the game and source-log session with -StartLunaHookBridge.")
+    elif luna_hook_bridge.get("currentProcessActive") is True:
         actions.append("The LunaHook bridge is active; hooked game text will be appended to the source log.")
     elif luna_hook_bridge.get("enabled"):
         actions.append("The saved LunaHook bridge is not running; restart source-log-session with -StartLunaHookBridge after starting the game.")

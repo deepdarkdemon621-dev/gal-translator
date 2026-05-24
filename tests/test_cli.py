@@ -2923,9 +2923,9 @@ class CliTests(unittest.TestCase):
                             "started": True,
                             "enabled": True,
                             "pid": os.getpid(),
-                            "gamePid": 1234,
+                            "gamePid": os.getpid(),
                             "statusLogPath": str(luna_hook_status_log),
-                            "command": [sys.executable, "-m", "gal_translator", "luna-hook-bridge", "1234", str(source_log)],
+                            "command": [sys.executable, "-m", "gal_translator", "luna-hook-bridge", str(os.getpid()), str(source_log)],
                         },
                     },
                     ensure_ascii=False,
@@ -2972,6 +2972,8 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["closedLoopProof"]["subtitleText"], "translated base")
             self.assertTrue(payload["clipboardBridge"]["currentProcessActive"])
             self.assertTrue(payload["lunaHookBridge"]["currentProcessActive"])
+            self.assertTrue(payload["lunaHookBridge"]["gameProcessActive"])
+            self.assertTrue(payload["closedLoopProof"]["lunaHookGameProcessActive"])
             self.assertFalse(payload["processChecks"]["hook"][0]["running"])
             actions_text = " ".join(payload["nextActions"])
             self.assertIn("Full archive translation remains paused", actions_text)
@@ -2979,6 +2981,132 @@ class CliTests(unittest.TestCase):
             self.assertIn("clipboard bridge is active", actions_text)
             self.assertIn("LunaHook bridge is active", actions_text)
             self.assertIn("Do not run translate-all", actions_text)
+
+    def test_source_log_status_reports_stale_lunahook_game_pid(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            game_dir = root / "Game"
+            game_dir.mkdir()
+            workspace = root / "Workspace"
+            project = TranslationProjectManager(workspace).create_project(game_dir)
+            tracker = TranslationProgressTracker.initialize(
+                project,
+                [
+                    ScriptEntry("base:1", "\u304a\u306f\u3088\u3046", None, "base", 1, "artemis_ast"),
+                ],
+            )
+            tracker.mark_translated("base:1", "translated base")
+            source_log = root / "lunahook-source.txt"
+            source_log.write_text("\u304a\u306f\u3088\u3046\n", encoding="utf-8")
+            watcher_stdout = root / "source-log-watch.jsonl"
+            watcher_stdout.write_text(
+                json.dumps(
+                    {
+                        "status": "processed",
+                        "cycle": 1,
+                        "result": {
+                            "sessionSummary": {"status": "translation_ready", "scopedTranslatedCount": 1},
+                            "append": {"logEntryIds": ["base:1"]},
+                        },
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            subtitle_event_log = root / "subtitle-events.jsonl"
+            subtitle_event_log.write_text(
+                json.dumps(
+                    {
+                        "text": "translated base",
+                        "matchType": "exact",
+                        "visible": True,
+                        "missLogged": False,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            luna_hook_status_log = root / "lunahook-status.jsonl"
+            luna_hook_status_log.write_text(
+                json.dumps(
+                    {
+                        "status": "captured",
+                        "capturedCount": 1,
+                        "text": "\u304a\u306f\u3088\u3046",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            stale_game_pid = 99999999
+            report_path = root / "source-log-session-report.json"
+            report_path.write_text(
+                json.dumps(
+                    {
+                        "projectRoot": str(project.project_root),
+                        "sessionReportPath": str(report_path),
+                        "sourceLog": str(source_log),
+                        "sourceName": "lunahook",
+                        "eventLog": str(subtitle_event_log),
+                        "watcher": {
+                            "started": True,
+                            "pid": os.getpid(),
+                            "stdoutPath": str(watcher_stdout),
+                            "command": [sys.executable, "-m", "gal_translator", "translate-log"],
+                        },
+                        "subtitleWindow": {
+                            "started": True,
+                            "pid": os.getpid(),
+                            "command": [sys.executable, "-m", "gal_translator", "subtitle-window"],
+                        },
+                        "lunaHookBridge": {
+                            "started": True,
+                            "enabled": True,
+                            "pid": os.getpid(),
+                            "gamePid": stale_game_pid,
+                            "statusLogPath": str(luna_hook_status_log),
+                            "command": [sys.executable, "-m", "gal_translator", "luna-hook-bridge", str(stale_game_pid), str(source_log)],
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "gal_translator",
+                    "source-log-status",
+                    str(project.project_root),
+                    str(source_log),
+                    "--session-report",
+                    str(report_path),
+                    "--game-process",
+                    "definitely-not-a-real-game.exe",
+                ],
+                check=False,
+                capture_output=True,
+            )
+
+            stdout = result.stdout.decode("utf-8", errors="replace")
+            stderr = result.stderr.decode("utf-8", errors="replace")
+            self.assertEqual(result.returncode, 0, stderr)
+            payload = json.loads(stdout)
+            self.assertTrue(payload["lunaHookBridge"]["currentProcessActive"])
+            self.assertFalse(payload["lunaHookBridge"]["gameProcessActive"])
+            self.assertEqual(payload["closedLoopProof"]["status"], "hook_game_inactive")
+            self.assertFalse(payload["closedLoopProof"]["lunaHookGameProcessActive"])
+            actions_text = " ".join(payload["nextActions"])
+            self.assertIn("Game process is not running", actions_text)
+            self.assertIn("target game pid is no longer active", actions_text)
+            self.assertIn("-StartLunaHookBridge", actions_text)
+            self.assertNotIn("The LunaHook bridge is active; hooked game text will be appended", actions_text)
 
     def test_session_info_reports_saved_log_with_no_importable_source(self) -> None:
         with TemporaryDirectory() as tmp:

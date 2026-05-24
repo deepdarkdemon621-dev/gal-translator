@@ -1,5 +1,27 @@
 # Task Plan
 
+## 2026-05-24 Current Recovery State After Pause
+
+- The previous closed-loop session is no longer fully live:
+  - `selectoblige.exe` is not running.
+  - Saved subtitle-window pid is inactive.
+  - Saved source-log watcher pid is still active.
+  - Saved LunaHook bridge pid is still active, but its target game pid is inactive.
+- `source-log-status` now detects this precisely:
+  - `lunaHookBridge.gameProcessActive=false`
+  - `closedLoopProof.status=hook_game_inactive`
+- Correct recovery is to start the game and restart the source-log session with LunaHook bridge, not to resume global full translation.
+- Keep using scoped translation only:
+  - Full archive remains `6950/32978` translated, `26028` pending, `0` failed.
+  - The source log already has 11 importable lines and 7 unique log-referenced matched Artemis ids.
+- Current verified baseline: `python -m unittest discover -v` -> 145 tests passed.
+
+Next useful command shape after starting the game:
+
+```powershell
+.\scripts\source-log-session.ps1 -ProjectRoot "C:\Users\deepd\AppData\Local\GalTranslator\real-session-selectoblige\artemis-script-project\projects\pfs-rs-extract-selectoblige-pfs-v0.2.5-b56875e0b374" -SourceLog "C:\Users\deepd\AppData\Local\GalTranslator\real-session-selectoblige\lunahook-source.txt" -SourceName lunahook -StartLunaHookBridge -LunaHookGameProcess selectoblige.exe -BatchSize 1 -MaxBatches 1
+```
+
 ## 2026-05-24 Pause Checkpoint
 
 - Current decision: pause here. The usable MVP loop is in place and full archive translation remains paused to avoid unnecessary token spend.

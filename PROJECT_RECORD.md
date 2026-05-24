@@ -44,7 +44,7 @@ MVP direction:
 ## Current Verified Baseline
 
 - Environment check: `python -m gal_translator doctor` -> `status=ready`; Codex is on PATH, Tkinter imports, and the default workspace is writable.
-- Full test suite: `python -m unittest discover -v` -> 144 tests passed.
+- Full test suite: `python -m unittest discover -v` -> 145 tests passed.
 - Desktop shell dry-run: `python -m gal_translator desktop --dry-run` -> `status=ready` with Translation Preparation and Play Output entries, including Play Output `source-log-session` and a `sourceLogSession` command template.
 - Global skill setup: `any-search` installed from `https://github.com/anysearch-ai/anysearch-skill.git` into `C:\Users\deepd\.codex\skills\any-search`; restart Codex to load it. `skill-creator` is already installed as a system skill.
 - Synthetic end-to-end smoke: `python -m gal_translator smoke-test --workspace .tmp-smoke-resume-record-afterfix` -> `status=passed` with every `checks` value true.
@@ -64,6 +64,7 @@ MVP direction:
 - Real hooked story closed loop: LunaHook from LunaTranslator x64 identified the sample as Artemis, captured `「これが最後の質問だ」`, Codex translated it as `“这是最后一个问题。”`, replay matched 1/1, and a live `subtitle-window --source-log` showed the Chinese subtitle over the running game while the game displayed the Japanese line.
 - Textractor status: Textractor 5.2.0 is installed under `C:\Users\deepd\Desktop\Textractor`, but CLI auto-attach currently only emits the Clipboard thread for this sample. LunaHook is the verified hook path for this sample.
 - Pause checkpoint: the latest active source-log session is `logs\source-log-session-20260524-225357-report.json` for project `C:\Users\deepd\AppData\Local\GalTranslator\real-session-selectoblige\artemis-script-project\projects\pfs-rs-extract-selectoblige-pfs-v0.2.5-b56875e0b374`, source log `C:\Users\deepd\AppData\Local\GalTranslator\real-session-selectoblige\lunahook-source.txt`, game pid `26324`, watcher pid `3292`, subtitle-window pid `14860`, LunaHook bridge pid `37836`, clipboard bridge disabled. Latest proof: Hook text `窶補輔≠縺ゅ∝､ｱ謨励＠縺溘Ａ` matched `script/01_01繝励Ο繝ｭ繝ｼ繧ｰ_01.ast:143` and displayed subtitle `窶披泌賦蝠奇ｼ梧裾遐ｸ莠・Ａ` with exact visible output. Full archive translation remains paused at `6950/32978`; resume with scoped source-log translation, not global `translate-all`, unless explicitly requested.
+- Latest recovery diagnostic: after the game was closed, `source-log-status` now reports `closedLoopProof.status=hook_game_inactive` when the LunaHook bridge process is still alive but its saved target `gamePid` is no longer active. The next action is to restart `selectoblige.exe` and restart `source-log-session.ps1 -StartLunaHookBridge`, while keeping full archive translation paused.
 
 Important: the real `selectoblige.exe` sample has now been validated end-to-end through external Hook capture, real Codex batch translation, replay coverage, and an actual subtitle window while the game is running. Continue hardening reusable tooling around that verified path.
 
